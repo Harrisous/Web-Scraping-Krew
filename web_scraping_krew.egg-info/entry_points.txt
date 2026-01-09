@@ -1,0 +1,2 @@
+[console_scripts]
+scrape_site = src.cli:scrape_site
