@@ -31,6 +31,7 @@ async def process_urls_async(
     urls: list[str],
     extractor: Extractor,
     enricher: Enricher,
+    keyword_extractor: KeywordExtractor,
     writer: Writer,
     max_concurrent: int = 10,
     delay: float = 0.1,
@@ -42,6 +43,7 @@ async def process_urls_async(
         urls: List of URLs to process
         extractor: Content extractor instance
         enricher: Metadata enricher instance
+        keyword_extractor: Keyword extractor instance
         writer: Output writer instance
         max_concurrent: Maximum concurrent requests
         delay: Delay between requests
@@ -242,6 +244,7 @@ def scrape_site(
                 urls=urls,
                 extractor=extractor,
                 enricher=enricher,
+                keyword_extractor=keyword_extractor,
                 writer=writer,
                 max_concurrent=max_concurrent,
                 delay=delay,

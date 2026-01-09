@@ -183,10 +183,49 @@ class Extractor:
         # Try to find main content container using multiple strategies
         main_content = None
 
+        # Strategy 0: Check for listing pages with multiple items (e.g., product listings)
+        # Look for containers that hold multiple articles/items
+        listing_containers = [
+            soup_copy.find("ol", class_="row"),  # books.toscrape.com pattern
+            soup_copy.find("ul", class_="products"),
+            soup_copy.find("div", class_="products"),
+            soup_copy.find("div", class_="product-list"),
+            soup_copy.find("div", class_="items"),
+            soup_copy.find("div", class_="listing"),
+        ]
+        for container in listing_containers:
+            if container:
+                # Check if it contains multiple items
+                articles = container.find_all("article")
+                items = container.find_all(["article", "div"], class_=re.compile(r"product|item", re.I))
+                if len(articles) > 1 or len(items) > 1:
+                    main_content = container
+                    break
+
         # Strategy 1: Semantic HTML5 elements
-        main_content = soup_copy.find("main")
         if not main_content:
-            main_content = soup_copy.find("article")
+            main_content = soup_copy.find("main")
+            if not main_content:
+                # For article tags, check if there are multiple articles (listing page)
+                all_articles = soup_copy.find_all("article")
+                if len(all_articles) > 1:
+                    # Find the parent container that holds all articles
+                    if all_articles:
+                        parent = all_articles[0].parent
+                        # Check if parent contains multiple articles
+                        if len(parent.find_all("article")) > 1:
+                            main_content = parent
+                        else:
+                            # Fall back to finding a common ancestor
+                            common_parent = all_articles[0].parent
+                            for article in all_articles[1:]:
+                                # Find common ancestor
+                                while common_parent and article not in common_parent.descendants:
+                                    common_parent = common_parent.parent
+                            if common_parent:
+                                main_content = common_parent
+                elif len(all_articles) == 1:
+                    main_content = all_articles[0]
         
         # Strategy 2: Role attributes
         if not main_content:
@@ -200,9 +239,10 @@ class Extractor:
                 try:
                     found = soup_copy.select_one(selector)
                     if found:
-                        # Check if it has substantial content
+                        # Check if it has substantial content or contains multiple items
                         text_length = len(found.get_text(strip=True))
-                        if text_length > 100:  # Minimum content threshold
+                        item_count = len(found.find_all(["article", "div"], class_=re.compile(r"product|item", re.I)))
+                        if text_length > 100 or item_count > 1:  # Minimum content threshold or multiple items
                             main_content = found
                             break
                 except Exception:

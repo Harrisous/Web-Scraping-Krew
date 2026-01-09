@@ -11,17 +11,45 @@ logger = logging.getLogger(__name__)
 # Download required NLTK data if not already present
 def _ensure_nltk_data():
     """Ensure required NLTK data is downloaded."""
+    # Try to find punkt_tab (newer NLTK versions) first
+    punkt_found = False
     try:
-        nltk.data.find('tokenizers/punkt')
+        nltk.data.find('tokenizers/punkt_tab')
+        punkt_found = True
     except LookupError:
-        logger.info("Downloading NLTK punkt tokenizer...")
-        nltk.download('punkt', quiet=True)
+        try:
+            nltk.data.find('tokenizers/punkt')
+            punkt_found = True
+        except LookupError:
+            pass
+    
+    if not punkt_found:
+        logger.info("Downloading NLTK punkt tokenizer (punkt_tab)...")
+        try:
+            # Try newer punkt_tab first (required by newer rake-nltk)
+            # Use quiet=True but verify download completed
+            nltk.download('punkt_tab', quiet=True)
+            # Verify it was downloaded successfully
+            nltk.data.find('tokenizers/punkt_tab')
+            logger.debug("punkt_tab downloaded successfully")
+        except Exception as e1:
+            logger.info(f"punkt_tab download failed, trying punkt: {e1}")
+            try:
+                # Fallback to older punkt
+                nltk.download('punkt', quiet=True)
+                nltk.data.find('tokenizers/punkt')
+                logger.debug("punkt downloaded successfully")
+            except Exception as e2:
+                logger.warning(f"Could not download NLTK punkt tokenizer: {e2}")
 
     try:
         nltk.data.find('corpora/stopwords')
     except LookupError:
         logger.info("Downloading NLTK stopwords...")
-        nltk.download('stopwords', quiet=True)
+        try:
+            nltk.download('stopwords', quiet=True)
+        except Exception as e:
+            logger.warning(f"Could not download NLTK stopwords: {e}")
 
 # Download data on module import
 _ensure_nltk_data()
@@ -41,11 +69,34 @@ class KeywordExtractor:
         _ensure_nltk_data()
         
         self.max_keywords = max_keywords
-        self.rake = Rake(
-            min_length=2,  # Minimum word length
-            max_length=3,  # Maximum phrase length
-            include_repeated_phrases=False,
-        )
+        
+        # Initialize Rake with error handling
+        try:
+            self.rake = Rake(
+                min_length=2,  # Minimum word length
+                max_length=3,  # Maximum phrase length
+                include_repeated_phrases=False,
+            )
+        except LookupError as e:
+            # If punkt_tab is still missing, try downloading it again
+            if 'punkt_tab' in str(e) or 'punkt' in str(e):
+                logger.info("punkt_tab not found, attempting download...")
+                try:
+                    nltk.download('punkt_tab', quiet=True)
+                    # Verify download and retry initialization
+                    nltk.data.find('tokenizers/punkt_tab')
+                    self.rake = Rake(
+                        min_length=2,
+                        max_length=3,
+                        include_repeated_phrases=False,
+                    )
+                    logger.debug("Rake initialized successfully after punkt_tab download")
+                except Exception as download_error:
+                    logger.warning(f"Could not initialize Rake with punkt_tab: {download_error}")
+                    logger.warning("Will use fallback keyword extraction")
+                    self.rake = None
+            else:
+                raise
 
     def extract(self, title: Optional[str], body_text: Optional[str]) -> List[str]:
         """
@@ -70,6 +121,10 @@ class KeywordExtractor:
 
         if not text or len(text.strip()) < 10:
             return []
+
+        # If Rake initialization failed, use fallback immediately
+        if self.rake is None:
+            return self._fallback_keyword_extraction(text)
 
         try:
             # Extract keywords using RAKE

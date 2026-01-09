@@ -142,14 +142,14 @@ Each document in the JSONL output follows this schema:
   "title": "string - Page title",
   "url": "string - Full URL of the page",
   "body_text": "string - Cleaned main content text",
+  "keywords": "array[string] - Extracted keywords/phrases (up to 10)",
   "word_count": "integer - Number of words",
   "char_count": "integer - Number of characters",
   "language": "string - ISO 639-1 language code (e.g., 'en', 'fr')",
   "content_type": "string - Classification: 'product_page', 'doc_page', 'article', 'homepage', 'listing_page', 'other'",
   "fetched_at": "string - ISO 8601 timestamp (UTC)",
   "reading_time_minutes": "number - Estimated reading time in minutes",
-  "has_code": "boolean - Whether content likely contains code",
-  "has_images": "boolean - Whether page contains images (currently always false)"
+  "images": "array[string] - List of absolute image URLs found on the page"
 }
 ```
 
@@ -157,15 +157,15 @@ Each document in the JSONL output follows this schema:
 
 - **title**: Extracted from `<title>`, `<h1>`, or `og:title` meta tag
 - **url**: Canonical URL of the scraped page
-- **body_text**: Main content with HTML tags removed, navigation/footer excluded
+- **body_text**: Main content with HTML tags removed, navigation/footer excluded. For listing pages, includes all items (not just the first)
+- **keywords**: Array of extracted keywords/phrases using RAKE algorithm (up to 10 keywords)
 - **word_count**: Total word count (title + body)
 - **char_count**: Total character count (title + body)
 - **language**: Detected using `langdetect` library
 - **content_type**: Heuristic classification based on URL patterns and content
 - **fetched_at**: Timestamp when the page was fetched (UTC)
 - **reading_time_minutes**: Based on 200 words per minute reading speed
-- **has_code**: Detects code-like patterns (functions, classes, imports, etc.)
-- **has_images**: Placeholder for future image detection
+- **images**: Array of absolute image URLs extracted from the page (includes `src`, `srcset`, `data-src`, and background images)
 
 ## Design Decisions
 

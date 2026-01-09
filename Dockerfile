@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY src/ ./src/
 COPY setup.py .
+COPY README.md .
+COPY LICENSE .
 
 # Install the package
 RUN pip install --no-cache-dir -e .
