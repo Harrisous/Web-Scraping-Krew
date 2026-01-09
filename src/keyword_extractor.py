@@ -3,9 +3,28 @@
 import logging
 import re
 from typing import List, Optional
+import nltk
 from rake_nltk import Rake
 
 logger = logging.getLogger(__name__)
+
+# Download required NLTK data if not already present
+def _ensure_nltk_data():
+    """Ensure required NLTK data is downloaded."""
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        logger.info("Downloading NLTK punkt tokenizer...")
+        nltk.download('punkt', quiet=True)
+
+    try:
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        logger.info("Downloading NLTK stopwords...")
+        nltk.download('stopwords', quiet=True)
+
+# Download data on module import
+_ensure_nltk_data()
 
 
 class KeywordExtractor:
@@ -18,6 +37,9 @@ class KeywordExtractor:
         Args:
             max_keywords: Maximum number of keywords to extract
         """
+        # Ensure NLTK data is available before initializing Rake
+        _ensure_nltk_data()
+        
         self.max_keywords = max_keywords
         self.rake = Rake(
             min_length=2,  # Minimum word length
