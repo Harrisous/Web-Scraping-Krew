@@ -12,12 +12,18 @@ A production-minded web scraping pipeline designed to collect high-quality docum
 - Diverse content types (product pages, category pages, homepage)
 - Good for demonstrating content extraction and classification
 - No authentication or complex JavaScript requirements
+- Perfect for learning and testing web scraping techniques
+- Includes product images, tables, and structured data
 
 ## Features
 
+- **Two-Phase Workflow**: Efficient URL collection followed by parallel content fetching
+- **Async/Concurrent Processing**: High-performance async fetching with configurable concurrency
+- **Modern Web Design Support**: Enhanced extractor handles flex layouts, modern CSS patterns, and complex HTML structures
 - **Intelligent Crawling**: Follows internal links with depth control and deduplication
-- **Content Extraction**: Extracts main content while removing navigation, footers, and ads
+- **Content Extraction**: Extracts main content while removing navigation, footers, and ads (improved for modern sites)
 - **AI Enrichment**: Adds metadata useful for AI workflows (language, content type, reading time, etc.)
+- **Timestamped Output**: Automatic timestamped output files with hash-based naming
 - **Idempotency**: Resume mode to skip already-scraped URLs
 - **Error Handling**: Robust error handling with retries and graceful degradation
 - **Configurable Filters**: URL pattern filtering for targeted scraping
@@ -58,39 +64,50 @@ A production-minded web scraping pipeline designed to collect high-quality docum
 ### Basic Usage
 
 ```bash
-scrape_site --start-url=https://books.toscrape.com --max-pages=50 --output=books.jsonl
+# Uses default output file: output.jsonl
+scrape_site --start-url=https://web-scraping.dev --max-pages=50
+
+# Specify custom output file
+scrape_site --start-url=https://web-scraping.dev --max-pages=50 --output=custom.jsonl
+
+# Enable timestamped output (appends hash: output_a1b2c3d4.jsonl)
+scrape_site --start-url=https://web-scraping.dev --max-pages=50 --timestamp
 ```
 
 ### Advanced Usage
 
 ```bash
-# With custom depth and delay
+# High-performance scraping with concurrent requests
 scrape_site \
   --start-url=https://books.toscrape.com \
   --max-pages=100 \
-  --max-depth=3 \
-  --delay=1.5 \
-  --output=books.jsonl
+  --max-concurrent=20 \
+  --delay=0.1
 
-# With URL pattern filtering (only scrape /books/ pages)
+# With URL pattern filtering (only scrape /catalogue/ pages)
 scrape_site \
   --start-url=https://books.toscrape.com \
   --max-pages=50 \
-  --url-pattern="/books/" \
-  --output=books.jsonl
+  --url-pattern="/catalogue/" \
+  --max-concurrent=15
 
 # Resume mode (skip already scraped URLs)
 scrape_site \
   --start-url=https://books.toscrape.com \
   --max-pages=100 \
-  --output=books.jsonl \
   --resume
+
+# Enable timestamped output (appends hash to filename)
+scrape_site \
+  --start-url=https://books.toscrape.com \
+  --max-pages=50 \
+  --output=output.jsonl \
+  --timestamp
 
 # Verbose logging
 scrape_site \
   --start-url=https://books.toscrape.com \
   --max-pages=50 \
-  --output=books.jsonl \
   --verbose
 ```
 
@@ -100,10 +117,21 @@ scrape_site \
 - `--max-pages` (default: 100): Maximum number of pages to scrape
 - `--max-depth` (default: 3): Maximum crawling depth
 - `--output` (default: output.jsonl): Output JSONL file path
-- `--delay` (default: 1.0): Delay between requests in seconds
+- `--delay` (default: 0.1): Delay between requests in seconds (phase 2)
 - `--url-pattern`: Optional regex pattern to filter URLs
 - `--resume`: Skip URLs already in output file (idempotency)
+- `--max-concurrent` (default: 10): Maximum concurrent requests in phase 2
+- `--timestamp`: Enable timestamped output filenames (appends hash to filename)
 - `--verbose` / `-v`: Enable verbose logging
+
+### Two-Phase Workflow
+
+The scraper uses an optimized two-phase approach:
+
+1. **Phase 1 - URL Collection**: Sequentially crawls the site to discover all URLs (with throttling)
+2. **Phase 2 - Content Processing**: Concurrently fetches and processes content using async I/O
+
+This approach maximizes performance while respecting rate limits during discovery.
 
 ## Data Schema
 
@@ -143,16 +171,40 @@ Each document in the JSONL output follows this schema:
 
 ### Content Extraction Strategy
 
-1. **Main Content Identification**:
-   - Prioritizes `<main>` or `<article>` tags
-   - Falls back to content containers with common class names
-   - Removes navigation, headers, footers, scripts, and styles
+1. **Main Content Identification** (Enhanced for modern web design):
+   - Prioritizes semantic HTML5 elements (`<main>`, `<article>`)
+   - Uses ARIA role attributes (`role="main"`, `role="article"`)
+   - Tries common content class names and data attributes
+   - Falls back to heuristic: finds largest text container (useful for flex/grid layouts)
+   - Removes navigation, headers, footers, scripts, styles, modals, popups, cookie banners
 
-2. **Text Cleaning**:
+2. **Table Extraction**:
+   - Extracts all table content from `<table>` elements
+   - Preserves table structure with pipe separators (|)
+   - Includes both `<thead>` and `<tbody>` content
+   - Formats tables as readable text for AI processing
+
+3. **Image Extraction**:
+   - Extracts images from `<img src="">` attributes
+   - Handles responsive images via `srcset` attribute
+   - Supports lazy-loaded images (`data-src`, `data-lazy-src`)
+   - Extracts background images from CSS `style` attributes
+   - Resolves relative URLs to absolute URLs
+   - Filters out data URIs and icon files (.ico, .svg)
+
+4. **Text Cleaning** (Improved):
    - Strips HTML tags
+   - Removes invisible Unicode characters (prevents AI obfuscation issues)
    - Normalizes whitespace (multiple spaces → single space)
    - Removes excessive newlines
+   - Removes common flex layout artifacts (pipe separators, bullets)
    - Preserves paragraph structure
+
+5. **Keyword Extraction**:
+   - Uses RAKE (Rapid Automatic Keyword Extraction) algorithm
+   - Extracts up to 10 keywords/phrases per page
+   - Filters stop words and short terms
+   - Optimized for AI workflows and search indexing
 
 ### Page Filtering Logic
 

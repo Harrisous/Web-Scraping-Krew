@@ -3,7 +3,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from urllib.parse import urlparse
 import langdetect
 from langdetect import LangDetectException
@@ -17,7 +17,13 @@ class Enricher:
     # Average reading speed (words per minute)
     WORDS_PER_MINUTE = 200
 
-    def enrich(self, title: Optional[str], body_text: Optional[str], url: str) -> Dict:
+    def enrich(
+        self,
+        title: Optional[str],
+        body_text: Optional[str],
+        url: str,
+        images: Optional[List[str]] = None,
+    ) -> Dict:
         """
         Enrich document with metadata.
 
@@ -25,6 +31,7 @@ class Enricher:
             title: Document title
             body_text: Document body text
             url: Document URL
+            images: List of image URLs (optional)
 
         Returns:
             Enriched document dictionary
@@ -49,9 +56,8 @@ class Enricher:
         # Reading time
         reading_time_minutes = word_count / self.WORDS_PER_MINUTE if word_count > 0 else 0.0
 
-        # Additional signals
-        has_code = self._has_code_blocks(body_text) if body_text else False
-        has_images = False  # Could be enhanced by checking HTML
+        # Process images
+        image_list = images if images else []
 
         return {
             "word_count": word_count,
@@ -60,8 +66,7 @@ class Enricher:
             "content_type": content_type,
             "fetched_at": datetime.utcnow().isoformat() + "Z",
             "reading_time_minutes": round(reading_time_minutes, 2),
-            "has_code": has_code,
-            "has_images": has_images,
+            "images": image_list,
         }
 
     def _detect_language(self, text: str) -> str:
@@ -125,33 +130,3 @@ class Enricher:
 
         return "other"
 
-    def _has_code_blocks(self, text: Optional[str]) -> bool:
-        """
-        Check if text contains code-like patterns.
-
-        Args:
-            text: Text to check
-
-        Returns:
-            True if likely contains code
-        """
-        if not text:
-            return False
-
-        # Simple heuristics for code detection
-        code_indicators = [
-            r"def\s+\w+\s*\(",
-            r"function\s+\w+\s*\(",
-            r"class\s+\w+",
-            r"import\s+\w+",
-            r"from\s+\w+\s+import",
-            r"<\?php",
-            r"console\.log",
-            r"public\s+static",
-        ]
-
-        for pattern in code_indicators:
-            if re.search(pattern, text, re.IGNORECASE):
-                return True
-
-        return False

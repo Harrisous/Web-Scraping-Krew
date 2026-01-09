@@ -5,4 +5,6 @@ click>=8.1.0
 langdetect>=1.0.9
 tqdm>=4.66.0
 pytest>=7.4.0
+pytest-asyncio>=0.21.0
 python-dotenv>=1.0.0
+rake-nltk>=1.0.6
